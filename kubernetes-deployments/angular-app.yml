@@ -1,0 +1,69 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: angular-app
+  labels:
+    app.kubernetes.io/name: angular-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: angular-app
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: angular-app
+    spec:
+      containers:
+        - name: angular-app
+          image: rubenvillar/angular-one-build-multiple-environments:latest
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 15
+            timeoutSeconds: 5
+            successThreshold: 1
+            failureThreshold: 5
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 15
+            timeoutSeconds: 5
+            successThreshold: 1
+            failureThreshold: 5
+          volumeMounts:
+          - name: configdir
+            mountPath: /usr/share/nginx/html/assets/config/
+      initContainers:
+      - name: init-config
+        image: byrnedo/alpine-curl:latest
+        args: ['http://app-config-server/angular-app-remote-config/app-config.json', '--output', '/config-dir/app-config.json']
+        volumeMounts:
+        - name: configdir
+          mountPath: /config-dir
+      volumes:
+      - name: configdir
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: angular-app
+  labels:
+    app.kubernetes.io/name: angular-app
+spec:
+  type: NodePort
+  ports:
+    - port: 80
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/name: angular-app
